@@ -8,10 +8,10 @@ import torch.optim as optim
 from torch.utils.data import DataLoader
 from tqdm import tqdm
 
-from dataset import BrainSegmentationDataset as Dataset
+from dataset import ADMIRE_Dataset as Dataset
 from logger import Logger
 from loss import DiceLoss
-from transform import transforms
+from PIL import Image, ImageDraw
 from unet import UNet
 from utils import log_images, dsc
 
@@ -24,7 +24,7 @@ def main(args):
     loader_train, loader_valid = data_loaders(args)
     loaders = {"train": loader_train, "valid": loader_valid}
 
-    unet = UNet(in_channels=Dataset.in_channels, out_channels=Dataset.out_channels)
+    unet = UNet(in_channels=3, out_channels=1)
     unet.to(device)
 
     dsc_loss = DiceLoss()
@@ -38,7 +38,7 @@ def main(args):
 
     step = 0
 
-    for epoch in tqdm(range(args.epochs), total=args.epochs):
+    for epoch in range(args.epochs):
         for phase in ["train", "valid"]:
             if phase == "train":
                 unet.train()
@@ -47,12 +47,18 @@ def main(args):
 
             validation_pred = []
             validation_true = []
+            print("\nepoch: %d, %s: "%(epoch, phase))
 
-            for i, data in enumerate(loaders[phase]):
+            for i, data in tqdm(enumerate(loaders[phase]),total=len(loaders[phase])):
+
                 if phase == "train":
                     step += 1
 
                 x, y_true = data
+                x2 = torch.transpose(x,1,3)
+                x3 = torch.transpose(x2,2,3)
+                x = x3
+                y_true = y_true.unsqueeze(1)
                 x, y_true = x.to(device), y_true.to(device)
 
                 optimizer.zero_grad()
@@ -93,17 +99,18 @@ def main(args):
 
             if phase == "valid":
                 log_loss_summary(logger, loss_valid, step, prefix="val_")
+                gen_thepic(validation_pred,validation_true,epoch)
                 mean_dsc = np.mean(
                     dsc_per_volume(
                         validation_pred,
                         validation_true,
-                        loader_valid.dataset.patient_slice_index,
                     )
                 )
+
                 logger.scalar_summary("val_dsc", mean_dsc, step)
                 if mean_dsc > best_validation_dsc:
                     best_validation_dsc = mean_dsc
-                    torch.save(unet.state_dict(), os.path.join(args.weights, "unet.pt"))
+                    torch.save(unet.state_dict(), os.path.join(args.weights, "unet_try300.pt"))
                 loss_valid = []
 
     print("Best validation mean DSC: {:4f}".format(best_validation_dsc))
@@ -133,32 +140,62 @@ def data_loaders(args):
 
     return loader_train, loader_valid
 
-
 def datasets(args):
+    # train = Dataset(
+    #     images_dir=args.images,
+    #     subset="train",
+    #     image_size=args.image_size,
+    #     transform=transforms(scale=args.aug_scale, angle=args.aug_angle, flip_prob=0.5),
+    # )
+    # valid = Dataset(
+    #     images_dir=args.images,
+    #     subset="validation",
+    #     image_size=args.image_size,
+    #     random_sampling=False,
+    # )
+
     train = Dataset(
-        images_dir=args.images,
-        subset="train",
-        image_size=args.image_size,
-        transform=transforms(scale=args.aug_scale, angle=args.aug_angle, flip_prob=0.5),
+        imgsize=args.image_size,
+        folder_path=args.images,
+        subset = "train",
+        fold_num=0,
     )
     valid = Dataset(
-        images_dir=args.images,
-        subset="validation",
-        image_size=args.image_size,
-        random_sampling=False,
+        imgsize=args.image_size,
+        folder_path=args.images,
+        subset = "validation",
+        fold_num=0,
     )
+
     return train, valid
 
+def gen_thepic(validation_pred, validation_true, epo):
+    for p in range(len(validation_pred)):
+        # y_pred = np.round(np.array(validation_pred[p]).squeeze()*255).astype(int)
+        y_pred = np.round(np.array(validation_pred[p]).squeeze())*255
+        # y_true = np.round(np.array(validation_true[p]).squeeze()*255).astype(int)
 
-def dsc_per_volume(validation_pred, validation_true, patient_slice_index):
+        y_predimg = Image.fromarray(y_pred)
+        y_predimg.save("results/pred_epo"+str(epo)+"_val"+str(p)+".gif")
+
+        # predimgnp = np.array(Image.fromarray(y_pred).convert('RGB'))
+        # predimgnp[:,:,1] = 0
+        # predimgnp[:, :, 2] = 0
+        # predtrunp = np.array(Image.fromarray(y_true).convert('RGB'))
+        # predtrunp[:,:,0] = 0
+        # predtrunp[:,:,2] = 0
+        #
+        # predfin = (predimgnp*0.5+predtrunp).astype(np.uint8)
+        # predfin = Image.fromarray(np.clip(predfin,0,255),"RGB")
+        # predfin.save("results/epo"+str(epo)+"_val"+str(p)+".jpg")
+
+
+def dsc_per_volume(validation_pred, validation_true):
     dsc_list = []
-    num_slices = np.bincount([p[0] for p in patient_slice_index])
-    index = 0
-    for p in range(len(num_slices)):
-        y_pred = np.array(validation_pred[index : index + num_slices[p]])
-        y_true = np.array(validation_true[index : index + num_slices[p]])
+    for p in range(len(validation_pred)):
+        y_pred = np.array(validation_pred[p]).squeeze()
+        y_true = np.array(validation_true[p]).squeeze()
         dsc_list.append(dsc(y_pred, y_true))
-        index += num_slices[p]
     return dsc_list
 
 
@@ -208,8 +245,8 @@ if __name__ == "__main__":
     parser.add_argument(
         "--workers",
         type=int,
-        default=4,
-        help="number of workers for data loading (default: 4)",
+        default=0,
+        help="number of workers for data loading (default: 0)",
     )
     parser.add_argument(
         "--vis-images",
@@ -230,12 +267,12 @@ if __name__ == "__main__":
         "--logs", type=str, default="./logs", help="folder to save logs"
     )
     parser.add_argument(
-        "--images", type=str, default="./kaggle_3m", help="root folder with images"
+        "--images", type=str, default="./data", help="root folder with images"
     )
     parser.add_argument(
         "--image-size",
         type=int,
-        default=256,
+        default=224,
         help="target input image size (default: 256)",
     )
     parser.add_argument(

@@ -1,4 +1,16 @@
-# U-Net for brain segmentation
+## Universal U-Net for Object Segmentation
+
+Based on "U-Net for brain segmentation", special thanks to Buda and their team. Please consider cite their research in use of this code.
+
+I edited their code so that you can import your custom dataset to train segmentation. Just put your original image (MUST BE GRAYSCALE) into "data/image" and binary mask image into "data/mask", run train.py, and you are ready to go.
+
+这是一个到手即用的U-Net包，只需要把你的数据集中的灰度图片放进data/image，二值mask图片放进data/mask，运行train.py就可以啦
+
+inference.py目前没有修改。
+
+
+
+### U-Net for brain segmentation
 
 U-Net implementation in PyTorch for FLAIR abnormality segmentation in brain MRI based on a deep learning segmentation algorithm used in [Association of genomic subtypes of lower-grade gliomas with shape features automatically extracted by a deep learning algorithm](https://doi.org/10.1016/j.compbiomed.2019.05.002).
 
@@ -18,7 +30,7 @@ If you use code or weights shared in this repository, please consider citing:
 }
 ```
 
-## docker
+### docker
 
 ```
 docker build -t brainseg .
@@ -28,7 +40,7 @@ docker build -t brainseg .
 nvidia-docker run --rm --shm-size 8G -it -v `pwd`:/workspace brainseg
 ```
 
-## PyTorch Hub
+### PyTorch Hub
 
 Loading model using PyTorch Hub: [pytorch.org/hub/mateuszbuda\_brain-segmentation-pytorch\_unet](https://pytorch.org/hub/mateuszbuda_brain-segmentation-pytorch_unet/)
 
@@ -38,20 +50,20 @@ model = torch.hub.load('mateuszbuda/brain-segmentation-pytorch', 'unet',
     in_channels=3, out_channels=1, init_features=32, pretrained=True)
 ```
 
-## data
+### data
 
 ![dataset](./assets/brain-mri-lgg.png)
 
 Dataset used for development and evaluation was made publicly available on Kaggle: [kaggle.com/mateuszbuda/lgg-mri-segmentation](https://www.kaggle.com/mateuszbuda/lgg-mri-segmentation).
 It contains MR images from [TCIA LGG collection](https://wiki.cancerimagingarchive.net/display/Public/TCGA-LGG) with segmentation masks approved by a board-certified radiologist at Duke University.
 
-## model
+### model
 
 A segmentation model implemented in this repository is U-Net as described in [Association of genomic subtypes of lower-grade gliomas with shape features automatically extracted by a deep learning algorithm](https://doi.org/10.1016/j.compbiomed.2019.05.002) with added batch normalization.
 
 ![unet](./assets/unet.png)
 
-## results
+### results
 
 |![TCGA_DU_6404_19850629](./assets/TCGA_DU_6404_19850629.gif)|![TCGA_HT_7879_19981009](./assets/TCGA_HT_7879_19981009.gif)|![TCGA_CS_4944_20010208](./assets/TCGA_CS_4944_20010208.gif)|
 |:-------:|:-------:|:-------:|
@@ -67,13 +79,13 @@ Distribution of DSC for 10 randomly selected validation cases.
 The red vertical line corresponds to mean DSC (91%) and the green one to median DSC (92%).
 Results may be biased since model selection was based on the mean DSC on these validation cases.
 
-## inference
+### inference
 
 1. Download and extract the dataset from [Kaggle](https://www.kaggle.com/mateuszbuda/lgg-mri-segmentation).
 2. Run docker container.
 3. Run `inference.py` script with specified paths to weights and images. Trained weights for input images of size 256x256 are provided in `./weights/unet.pt` file. For more options and help run: `python3 inference.py --help`.
 
-## train
+### train
 
 1. Download and extract the dataset from [Kaggle](https://www.kaggle.com/mateuszbuda/lgg-mri-segmentation).
 2. Run docker container.
@@ -85,6 +97,6 @@ Due to memory limitations for Kaggle kernels, input images are of size 224x224 i
 Running this code on a custom dataset would likely require adjustments in `dataset.py`.
 Should you need help with this, just open an issue.
 
-## TensorRT inference
+### TensorRT inference
 
 If you want to run the model inference with TensorRT runtime, here is a blog post from Nvidia that covers this: [Speeding Up Deep Learning Inference Using TensorRT](https://developer.nvidia.com/blog/speeding-up-deep-learning-inference-using-tensorrt/).

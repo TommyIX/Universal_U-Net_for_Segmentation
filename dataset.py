@@ -1,13 +1,51 @@
 import os
 import random
+import glob
 
 import numpy as np
 import torch
 from skimage.io import imread
+from skimage.transform import resize
+from sklearn.model_selection import KFold
 from torch.utils.data import Dataset
 
 from utils import crop_sample, pad_sample, resize_sample, normalize_volume
 
+class ADMIRE_Dataset(Dataset):
+    '''
+    搞这玩意就直接上五折了
+    '''
+    def __init__(self, imgsize, folder_path, subset, fold_num, seed=42, usepic=500):
+        super(ADMIRE_Dataset, self).__init__()
+        assert subset in ["train", "validation"]
+
+        self.img_files = glob.glob(os.path.join(folder_path,'image','*.jpg'))[:usepic]
+        self.imgsize = imgsize
+
+        kf = KFold(n_splits=5, random_state=seed, shuffle=True)
+
+        ifile = []
+
+        for i, (train_index, test_index) in enumerate(kf.split(self.img_files)):
+            if i==fold_num:
+                if subset=="train":
+                    for j in train_index.tolist():
+                        ifile.append(self.img_files[j])
+                else:
+                    for j in test_index.tolist():
+                        ifile.append(self.img_files[j])
+        self.img_files = ifile
+        self.mask_files = [i.replace("image", "mask") for i in self.img_files]
+
+    def __getitem__(self, index):
+        img_path = self.img_files[index]
+        mask_path = self.mask_files[index]
+        data = resize(imread(img_path),(self.imgsize,self.imgsize))
+        label = resize(imread(mask_path,as_gray=True),(self.imgsize,self.imgsize))
+        return torch.from_numpy(data).float(), torch.from_numpy(label).float()
+
+    def __len__(self):
+        return len(self.img_files)
 
 class BrainSegmentationDataset(Dataset):
     """Brain MRI dataset for FLAIR abnormality segmentation"""
