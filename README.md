@@ -8,9 +8,12 @@ I edited their code so that you can import your custom dataset to train segmenta
 
 inference.py目前没有修改。
 
+------
+
+The following is the original README.md. 以下是原作者的README，再次感谢他们
 
 
-### U-Net for brain segmentation
+## U-Net for brain segmentation
 
 U-Net implementation in PyTorch for FLAIR abnormality segmentation in brain MRI based on a deep learning segmentation algorithm used in [Association of genomic subtypes of lower-grade gliomas with shape features automatically extracted by a deep learning algorithm](https://doi.org/10.1016/j.compbiomed.2019.05.002).
 
